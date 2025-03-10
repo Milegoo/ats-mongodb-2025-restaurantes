@@ -12,7 +12,8 @@ Estas tareas deben realizarse obligatoriamente para aprobar la práctica:
 
 Primero de todo, hemos analizado las dos colecciones y hemos visto que una inspección está asociada a un restaurante, mientras que un restaurante puede tener varias inspecciones. Para determinar si la relación era one-to-few o one-to-many, hemos realizado algunas consultas.
 
-La primera consulta ha sido para ver la media de inspecciones por restaurante:
+La primera consulta ha sido para ver la media de inspecciones por restaurante. Se trata de la consulta 1 que se encuentra en el archivo de consultas ([consultas.js](../scripts/consultas.js))
+
 
 ```javascript
 db.inspections.aggregate([
@@ -34,26 +35,9 @@ El resultado obtenido en la consulta ha sido el siguiente:
 
 ![Resultado consulta 1](image.png)
 
-Como podemos ver la media es de menos de 3 inspecciones de restaurantes lo que podria indicar un esquema one-to-few pero para asegurarlo vamos a mirar los restaurantes con más cantidad de inspecciones, por si en algun caso algun restaurante tuviera muchas.
+Como podemos ver la media es de menos de 3 inspecciones  por restaurante lo que podria indicar un esquema one-to-few pero para asegurarlo vamos a mirar los restaurantes con más cantidad de inspecciones, por si en algun caso algun restaurante tuviera muchas.
 
-Para ello hacemos la siguiente consulta:
-
-```javascript
-db.inspections.aggregate([
-  {
-    "$group": {
-      "_id": "$restaurant_id",
-      "count": { "$sum": 1 }
-    }
-  },
-  {
-    "$sort": { "count": -1 }
-  },
-  {
-    "$limit": 5
-  }
-])
-```
+Para ello hacemos una consulta que calcula la máxima cantidad de inspecciones que llega a tener un restaurante actualmente. Se trata de la consulta 2 que se encuentra en el archivo de consultas ([consultas.js](../scripts/consultas.js))
 
 El resultado obtenido es el siguiente:
 
@@ -62,13 +46,38 @@ El resultado obtenido es el siguiente:
 - Justificar la elección de referencias (`restaurant_id`) en lugar de documentos embebidos.
 También puedes decidir crear una nueva collection que no utilice las referencias e incorpore los documentos embebidos.
 
-A pesar de que puede ser más cómodo tener una única colección con documentos embedidos ya que la relación es one-to-few y hay pocas inspecciones por restaurante, la elección de usar referencias con el campo restaurant_id que refrencia el restaurante al que se le ha realizado x inspección aporta mayor escalabilidad. Si por algun caso varios restaurante reciben una gran cantidad de inspecciones en el futuro el documento crecería demasiado y no seria eficiente.
+Hemos valorado la posibilidad de usar embeddings en lugar de referencias. Es decir, crear una nueva collection de restaurantes donde cada restaurante tenga un array de inspecciones con la información de cada inspección que se le ha realizado. Es una buena opción, teniendo en cuenta que cada restaurante por ahora tiene pocas inspecciones. Además usar embeddings podría ofrecer una accesibilidad más rápida y en una única consulta a las inspecciones de un restaurante concreto.
+
+Sin embargo, hemos decidido quedarnos con el uso de referencias con el campo restaurant_id que refrencia el restaurante al que se le ha realizado una inspección concreta. El motivo de esta elección es que en un futuro puede ser que los restaurantes empiecen a recibir muchas más inspecciones (en principio se hacen inspecciones anuales) con lo que si usaramos embeddings el documento podría crecer mucho y tener peor rendimiento. Además si se quieren realizar consultas sobre las inspecciones de todos los restaurantes en caso de usar embeddings se debería acceder al documento entero lo cual es poco óptimo.
 
 - Definir un esquema de validación para ambas colecciones.
 
 Para validar ambas colecciones se ha realizado un JSON Schema por cada colección. 
+Los json schema son las consultas 3 y 4 del fichero de consultas ([consultas.js](../scripts/consultas.js))
 
-Para la coleccion de restaurantes el esquema asegura que el campo "_id" sea un ObjectID, que el campo "name" sea un string obligatorio, 
+Para la coleccion de restaurantes (consulta 3) el esquema asegura lo siguiente:
+- _id debe ser un ObjectId válido.
+- id debe ser una cadena con el formato NNN-NNNN-AAA (ej. 123-2023-ENF).
+- certificate_number debe ser un número entero positivo.
+- business_name debe ser una cadena con al menos 1 carácter.
+- date debe ser una cadena en el formato MMM DD YYYY (ej. Jan 15 2024).
+- result debe ser una cadena de texto.
+- address debe ser un objeto que contiene:
+  - city: una cadena con al menos 1 carácter.
+  - zip: una cadena con solo letras y números.
+  - street: una cadena con al menos 1 carácter.
+  - number: una cadena opcional.
+- restaurant_id debe ser un ObjectId válido que referencia a un restaurante.
+- todos los campos son requeridos
+
+Para la coleccion de inspecciones (consulta 4) el esquema asegura lo siguiente:
+- _id debe ser un ObjectId válido.
+- name debe ser una cadena con al menos 1 carácter.
+- address debe ser una cadena con al menos 1 carácter.
+- outcode (opcional) debe ser una cadena que contenga solo letras y números.
+- postcode (opcional) debe ser una cadena que contenga solo letras y números.
+- type_of_food (opcional) debe ser una cadena con al menos 1 carácter.
+- URL (opcional) debe ser una cadena que comience con http o https seguido de :// 
 
 ### 2. Implementación de consultas en MongoDB
 
