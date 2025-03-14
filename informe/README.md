@@ -1,6 +1,6 @@
 # Informe Práctica MongoDB
 
-*Autores: Eloi Milego (1633753) y Raul Villar*
+*Autores: Eloi Milego (1633753) y Raul Villar (1596830)*
 
 ## Tareas Obligatorias (Hasta 4 puntos)
 
@@ -82,8 +82,70 @@ Para la coleccion de inspecciones (consulta 4) el esquema asegura lo siguiente:
 ### 2. Implementación de consultas en MongoDB
 
 - Buscar todos los restaurantes de un tipo de comida específico (ej. "Chinese").
+
+Para buscar todos los restaurantes de un tipo de comida nos basaremos en el campo 'type_of_food' de la collection restaurants. Con un find de este campo es suficiente.
+
+```javascript
+var categoria = "Chinese"; // Define la comida deseada
+
+db.restaurants.find({ 
+  type_of_food: categoria 
+});
+
+```
+
+Esta consulta la cual se basa en la variable 'categoria' para poder filtrar, devuelve una lista de todos los restaurantes con la comida deseada en este formato:
+![alt text](image-2.png)
+
+
 - Listar las inspecciones con violaciones, ordenadas por fecha.
+
+Para listar las inspecciones con violaciones, filtraremos por resultado "Violation Issued"
+Para poder ordenar por fecha, necesitamos pasar el string a un formato fecha que pueda ser ordenado cronologicamente, y despues ordenar con un .sort()
+
+```javascript
+
+db.inspections.aggregate([
+  {
+    $match: {
+      result: "Violation Issued"
+    }
+  },
+  {
+    $addFields: {
+      dateAsDate: {
+        $dateFromString: {
+          dateString: '$date',
+          format: '%b %d %Y'
+        }
+      }
+    }
+  },
+  {
+    $sort: {
+      dateAsDate: 1
+    }
+  },
+  {
+    $project: {
+      dateAsDate: 0  
+    }
+  }
+]);
+
+```
+
 - Encontrar restaurantes con una calificación superior a 4.
+
+Para esta busqueda haremos un find filtrando el campo "rating" en que sea mayor a 4.
+
+``` javascript
+
+db.restaurants.find({
+  "rating": { $gt: 4 }
+});
+
+```
 
 ### 3. Uso de agregaciones
 
