@@ -204,3 +204,9 @@ db.restaurants.find({
 //1 - Optimización del rendimiento
 
 //2 - Estrategias de escalabilidad
+
+sh.enableSharding("restaurant_db")
+
+sh.shardCollection("restaurant_db.inspections", { "result": 1, "restaurant_id": 1 })
+
+sh.shardCollection("restaurant_db.restaurants", { "rating": 1, "type_of_food": 1 })
