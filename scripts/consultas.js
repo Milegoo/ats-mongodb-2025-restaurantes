@@ -42,44 +42,41 @@ db.createCollection("restaurants", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["_id", "name", "address"],
+      required: ["_id", "name", "address", "outcode", "postcode"],
       properties: {
         _id: {
           bsonType: "objectId",
-          description: "Identificador único del restaurante."
+          description: "Restaurant identifier."
         },
         name: {
           bsonType: "string",
           minLength: 1,
-          description: "Nombre del restaurante."
+          description: "Restaurant name."
         },
         address: {
           bsonType: "string",
           minLength: 1,
-          description: "Dirección principal del restaurante."
+          description: "Main address of the restaurant."
         },
         outcode: {
           bsonType: "string",
           pattern: "^[A-Z0-9]+$",
-          minLength: 1,
-          description: "Código postal externo, solo letras y números."
+          description: "Outcode of the restaurant, only letters and numbers."
         },
         postcode: {
           bsonType: "string",
           pattern: "^[A-Z0-9]+$",
-          minLength: 1,
-          description: "Código postal interno del restaurante, solo letras y números."
+          description: "Postcode of the restaurant, only letters and numbers."
         },
         type_of_food: {
           bsonType: "string",
           minLength: 1,
-          description: "Tipo de comida del restaurante."
+          description: "Type of food served in the restaurant. (optional)"
         },
         URL: {
           bsonType: "string",
           pattern: "^https?:\\/\\/.+$",
-          minLength: 1,
-          description: "URL del menú del restaurante."
+          description: "URL of the restaurant website. (optional)"
         }
       }
     }
@@ -115,7 +112,6 @@ db.createCollection("inspections", { //rating?
         date: {
           bsonType: "string",
           pattern: "^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s\\d{2}\\s\\d{4}$",
-          minLength: 1,
           description: "Fecha de la inspección en formato 'MMM DD YYYY'."
         },
         result: {
@@ -125,7 +121,7 @@ db.createCollection("inspections", { //rating?
         },
         address: {
           bsonType: "object",
-          required: ["city", "zip", "street"],
+          required: ["city", "zip"],
           properties: {
             city: {
               bsonType: "string",
@@ -134,7 +130,6 @@ db.createCollection("inspections", { //rating?
             zip: {
               bsonType: "string",
               pattern: "^[A-Z0-9]+$",
-              minLength: 1,
             },
             street: {
               bsonType: "string",
@@ -222,12 +217,23 @@ db.inspections.aggregate([
 
 db.restaurants.aggregate([
   {
-      "$lookup": {
-          "from": "inspections",
-          "localField": "_id",
-          "foreignField": "restaurant_id",
-          "as": "inspection_history"      
-      }
+    $lookup: {
+      from: "inspections",
+      let: { restaurant_id: "$_id" },
+      pipeline: [
+        {
+          $addFields: {
+            restaurant_id: { $toObjectId: "$restaurant_id" }
+          }
+        },
+        {
+          $match: {
+            $expr: { $eq: ["$restaurant_id", "$$restaurant_id"] }
+          }
+        }
+      ],
+      as: "inspection_history"
+    }
   }
 ]);
 
