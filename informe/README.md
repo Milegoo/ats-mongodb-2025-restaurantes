@@ -1,6 +1,6 @@
 # Informe Práctica MongoDB
 
-*Autores: Eloi Milego (1633753) y Raul Villar*
+*Autores: Eloi Milego (1633753) y Raul Villar (1596830)*
 
 ## 1. Diseño del esquema de la base de datos
 
@@ -101,10 +101,73 @@ Para la coleccion de inspecciones (consulta 4) el esquema asegura lo siguiente:
 ## 2. Implementación de consultas en MongoDB
 
 - Buscar todos los restaurantes de un tipo de comida específico (ej. "Chinese").
+
+Para buscar todos los restaurantes de un tipo de comida nos basaremos en el campo 'type_of_food' de la collection restaurants. Con un find de este campo es suficiente.
+
+```javascript
+var categoria = "Chinese"; // Define la comida deseada
+
+db.restaurants.find({ 
+  type_of_food: categoria 
+});
+
+```
+
+Esta consulta la cual se basa en la variable 'categoria' para poder filtrar, devuelve una lista de todos los restaurantes con la comida deseada en este formato:
+
+![alt text](image-2.png)
+
+
 - Listar las inspecciones con violaciones, ordenadas por fecha.
+
+Para listar las inspecciones con violaciones, filtraremos por resultado "Violation Issued"
+Para poder ordenar por fecha, necesitamos pasar el string a un formato fecha que pueda ser ordenado cronologicamente, y despues ordenar con un .sort()
+
+```javascript
+
+db.inspections.aggregate([
+  {
+    $match: {
+      result: "Violation Issued"
+    }
+  },
+  {
+    $addFields: {
+      dateAsDate: {
+        $dateFromString: {
+          dateString: '$date',
+          format: '%b %d %Y'
+        }
+      }
+    }
+  },
+  {
+    $sort: {
+      dateAsDate: 1
+    }
+  },
+  {
+    $project: {
+      dateAsDate: 0  
+    }
+  }
+]);
+
+```
+
 - Encontrar restaurantes con una calificación superior a 4.
 
-## 3. Uso de agregaciones
+Para esta busqueda haremos un find filtrando el campo "rating" en que sea mayor a 4.
+
+``` javascript
+
+db.restaurants.find({
+  "rating": { $gt: 4 }
+});
+
+```
+
+### 3. Uso de agregaciones
 
 En este apartado se realizan 3 consultas utilizando agregaciones de MongoDB.
 
@@ -335,8 +398,49 @@ Como hemos podido ver en estas 4 consultas comunes para nuestro caso de uso de a
 ## 5. Estrategias de escalabilidad
 
 - Proponer una estrategia de sharding adecuada para este dataset.
+
+Para aplicar sharding en nuestro dataset, puesto a que usamos las collections originales, necesitamos un campo para cada colección.
+Para nuestro objetivo de la base de datos, será util buscar por rangos los restaurantes, un sharding por rangos se puede ajustar más a nuestro caso de uso, y no depender de usar todos los shards a la hora de hacer consultas. Mientras para inspecciones, es mas prioritario distribuir equitativamente, que las propias busquedas por rangos, de manera que un hash se adapta mejor a nuestra situación.
+
+Los campos más utilizados para hacer consultas son:
+Para la collection restaurants:
+  
+  &nbsp;&nbsp; -rating
+  
+  &nbsp;&nbsp; -type_of_food
+
+Para la collection inspections:
+  
+  &nbsp;&nbsp; -result
+  
+  &nbsp;&nbsp; -restaurant_id
+  
+  &nbsp;&nbsp; -address.city
+  
+  &nbsp;&nbsp; -date
+
+ De estos campos debemos elegir un campo con un rango definido, y que pueda separar los valores en una gran cantidad de shards.
+ Para la collection restaurants usaremos los campos 'rating' y 'type_of_food' para hacer un sharding combinado por rangos con clave doble para aumentar la cantidad de shards posibles y basado en las consultas mas comunes que haremos.
+ Para la collection inspections usaremos 'result' y 'restaurant_id' en un sharding combinado, ya que nuestro objetivo principal es poder distribuirlos bien en muchos shards.
+
 - Diseñar un esquema de replicación para alta disponibilidad.
+
+![alt text](Diagrama-fondo-blanco.png)
+
 - Analizar posibles cuellos de botella y soluciones.
 
-*El punto 2 es correcto si solo se implementa a nivel teorico justificando las decisiones de diseño*
+Cuellos de botella debidos a sharding:
 
+Aunque tenemos la collection inspections por 'result' y 'restaurant_id', si un restaurante tiene muchísimas inspecciones puede generar un cuello de botella muy grande debido a que se almacenaria todo en el mismo shard.
+
+Para la collection restaurants, si se genera una gran cantidad de restaurantes con un 'rating' y 'type_of_food' iguales, generará un gran cuello de botella debido a que se almacenarán en el mismo shard.
+
+La solución para estos cuellos de botella es en caso de alguno de estos casos de gran creación de entradas con mismo restaurante o tipo de comida y rating, estudiar si es mejor un sharding por hash.
+
+Cuellos de botella debidos a disponibilidad:
+
+Si una de las replicas falla se quedarán dos replicas disponibles, lo que puede producir empates en las votaciones y retrasar el reemplazo. Para solucionarlo añadiremos una replica arbitro, la cual solo pueda votar.
+
+Cuellos de botella debido a las colecciones:
+
+Tenemos las dos colecciones separadas, sin ninguna colección que las combine, esto puede generar un gran cuello de botella si hay muchas consultas que necesiten datos de ambas colecciones. La solución es hacer un caso de estudio para analizar cuanto de común son estas consultas y si se ganaría una mejora de rendimiento entre el coste que tiene crear y mantener una tercera collection, y la mejora de cuello de botella.

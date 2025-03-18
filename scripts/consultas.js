@@ -152,7 +152,49 @@ db.createCollection("inspections", { //rating?
 
 //2 - Implementación de consultas en MongoDB
 
-//Consulta 5...
+//Consulta 5 - Buscar todos los restaurantes de un tipo de comida específico
+
+var categoria = "Chinese"; // Define la comida deseada
+
+db.restaurants.find({ 
+  type_of_food: categoria 
+});
+
+//Consulta 6 - Listar las inspecciones con violaciones, ordenadas por fecha.
+
+db.inspections.aggregate([
+  {
+    $match: {
+      result: "Violation Issued"
+    }
+  },
+  {
+    $addFields: {
+      dateAsDate: {
+        $dateFromString: {
+          dateString: '$date',
+          format: '%b %d %Y'
+        }
+      }
+    }
+  },
+  {
+    $sort: {
+      dateAsDate: 1
+    }
+  },
+  {
+    $project: {
+      dateAsDate: 0  
+    }
+  }
+]);
+
+//Consulta 7 - Encontrar restaurantes con una calificación superior a 4.
+
+db.restaurants.find({
+  "rating": { $gt: 4 }
+});
 
 //3 - Uso de agregaciones
 
@@ -279,3 +321,9 @@ db.inspections.updateMany(
     db.inspections.createIndex({ date: 1 });
 
 //5 - Estrategias de escalabilidad
+
+sh.enableSharding("restaurant_db")
+
+sh.shardCollection("restaurant_db.inspections", { "result": 1, "restaurant_id": 1 })
+
+sh.shardCollection("restaurant_db.restaurants", { "rating": 1, "type_of_food": 1 })
