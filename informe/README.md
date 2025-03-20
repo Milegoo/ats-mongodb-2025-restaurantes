@@ -78,9 +78,9 @@ Para la coleccion de restaurantes el esquema asegura lo siguiente:
 - _id (required) debe ser un ObjectId. Así evitamos que se generen ids que no sean un ObjectId y que todos los restaurantes tengan un id asociado.
 - name (required) debe ser una cadena con al menos 1 carácter. Así evitamos que haya documentos de restaurantes sin nombre o con nombre vacío.
 - address (required) debe ser una cadena con al menos 1 carácter. Así evitamos que haya documentos de restaurantes sin dirección o dirección vacía.
-- outcode (opcional) no lo hemos considerado obligatorio porque quizás hay algun restaurante que con la dirección ya es suficiente. También comprobamos que sea alfanumérico.
-- postcode (opcional) tampoco lo hemos considerado obligatorio por el mismo motivo. También comprobamos que sea alfanumérico.
-- type_of_food (opcional) no lo consideramos obligatorio ya que puede haber restaurantes con mucha variedad. Aseguramos que en caso de que un documento tenga ese campo no esté vacío y tenga por lo menos un carácter.
+- outcode (required) Comprobamos que sea alfanumérico. Nos sirve para identificar geograficamente el restaurante.
+- postcode (required) Igual que outcode. También comprobamos que sea alfanumérico.
+- type_of_food (required) Hemos considerado ponerlo obligatorio ya que puede haber restaurantes con mucha variedad, pero ya que siempre hay alguna manera de describir el tipo de comida, lo hemos puesto obligatorio para poder utilizarlo como clave a la hora de hacer sharding. Aseguramos que el campo no esté vacío y tenga por lo menos un carácter.
 - URL (opcional) debe ser una cadena que comience con http o https seguido de :// para evitar links fraudulentos. No es obligatorio ya que hay restaurantes sin web.
 
 Para la coleccion de inspecciones (consulta 4) el esquema asegura lo siguiente:
@@ -93,7 +93,7 @@ Para la coleccion de inspecciones (consulta 4) el esquema asegura lo siguiente:
 - address (required) es obligatorio ya que toda inspección se hace en algun sitio y debe ser un objeto que contenga:
   - city (required): una cadena con al menos 1 carácter obligatoria.
   - zip (required): una cadena con solo letras y números obligatoria.
-  - street (required): una cadena con al menos 1 carácter obligatoria.
+  - street (opcional): una cadena opcional con al menos 1 carácter obligatorio, ya que en algunos casos (zonas rurales) se podría dar el caso de que la calle no tenga nombre.
   - number (opcional): una cadena opcional ya que no siempre una dirección tiene número.
 - restaurant_id (required) debe ser un ObjectId que referencia a un restaurante. Obligatorio ya que es la referencia con la colección de restaurantes.
 
@@ -155,6 +155,8 @@ db.inspections.aggregate([
 
 ```
 
+![alt text](image-3.png)
+
 - Encontrar restaurantes con una calificación superior a 4.
 
 Para esta busqueda haremos un find filtrando el campo "rating" en que sea mayor a 4.
@@ -166,6 +168,8 @@ db.restaurants.find({
 });
 
 ```
+
+![alt text](image-1.png)
 
 ### 3. Uso de agregaciones
 
@@ -397,7 +401,7 @@ Como hemos podido ver en estas 4 consultas comunes para nuestro caso de uso de a
 
 ## 5. Estrategias de escalabilidad
 
-- Proponer una estrategia de sharding adecuada para este dataset.
+La primera estrategia para mejorar la escalabilidad de nuestra base de datos es aplicar sharding.
 
 Para aplicar sharding en nuestro dataset, puesto a que usamos las collections originales, necesitamos un campo para cada colección.
 Para nuestro objetivo de la base de datos, será util buscar por rangos los restaurantes, un sharding por rangos se puede ajustar más a nuestro caso de uso, y no depender de usar todos los shards a la hora de hacer consultas. Mientras para inspecciones, es mas prioritario distribuir equitativamente, que las propias busquedas por rangos, de manera que un hash se adapta mejor a nuestra situación.
@@ -423,11 +427,11 @@ Para la collection inspections:
  Para la collection restaurants usaremos los campos 'rating' y 'type_of_food' para hacer un sharding combinado por rangos con clave doble para aumentar la cantidad de shards posibles y basado en las consultas mas comunes que haremos.
  Para la collection inspections usaremos 'result' y 'restaurant_id' en un sharding combinado, ya que nuestro objetivo principal es poder distribuirlos bien en muchos shards.
 
-- Diseñar un esquema de replicación para alta disponibilidad.
+Una vez tenemos el sharding, podemos diseñar un esquema con replicación para aumentar la disponibilidad:
 
 ![alt text](Diagrama-fondo-blanco.png)
 
-- Analizar posibles cuellos de botella y soluciones.
+Nuestras decisiones se han basado de acuerdo a nuestro caso de uso, pero este puede variar con el tiempo y acarrear problemas a la larga que habría que solucionar. A continuación presentamos los cuellos de botella mas posibles en un caso futuro de nuestro caso de uso.
 
 Cuellos de botella debidos a sharding:
 
